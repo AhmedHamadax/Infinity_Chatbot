@@ -1,0 +1,16 @@
+streamlit
+openai
+pandas
+numpy
+openpyxl
+langchain
+langchain-community
+langchain-huggingface
+langchain-text-splitters
+langchain-classic
+langgraph
+faiss-cpu
+sentence-transformers
+torch
+rank-bm25
+rapidfuzz

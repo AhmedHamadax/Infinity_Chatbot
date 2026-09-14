@@ -1,0 +1,8 @@
+{"memory": "User is concerned about fine lines around the eyes.", "type": "concern", "source": "user", "importance": "high"}
+{"memory": "Retinol Eye Cream is recommended for fine lines due to aging.", "type": "recommendation", "source": "system", "importance": "high"}
+{"memory": "Hyalu Collagen Eye Contour is recommended for fine lines due to dryness or dehydration.", "type": "recommendation", "source": "system", "importance": "high"}
+{"memory": "User is concerned about blackheads and clogged pores.", "type": "concern", "source": "user", "importance": "high"}
+{"memory": "Retinol B3 Serum is recommended for targeting blackheads and clogged pores with 0.5% retinol to promote skin renewal and prevent comedone formation.", "type": "recommendation", "source": "system", "importance": "high"}
+{"memory": "Micro Exfoliating Purifying Toner is suggested as a supportive product containing salicylic acid to help clear surface congestion.", "type": "recommendation", "source": "system", "importance": "medium"}
+{"memory": "Akren Cleanser is recommended as a gentle cleansing option suitable for removing oil and debris without over-stripping the skin.", "type": "recommendation", "source": "system", "importance": "medium"}
+{"memory": "The Infinity Eye Makeup Remover Virgin Coconut Oil is considered safe for use on the skin around the eyes and is designed to avoid irritation.", "type": "safety", "source": "system", "importance": "high"}
