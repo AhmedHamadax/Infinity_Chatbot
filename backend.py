@@ -2735,7 +2735,7 @@ def product_recommender_node(state: Routine_Filling):
     information_output = []
     Ingredients_to_check = []
 
-    FUZZY_MATCH_THRESHOLD = 80
+    FUZZY_MATCH_THRESHOLD = 50
 
 
     # =========================================================
