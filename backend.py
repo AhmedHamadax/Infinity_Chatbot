@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from langchain_huggingface import HuggingFaceEmbeddings
 import numpy as np
-
+print("\n\n🔥🔥🔥 DEBUG VERSION IS LOADED 🔥🔥🔥\n\n", flush=True)
 # ===== Source notebook cell 4 =====
 from openai import OpenAI
 
