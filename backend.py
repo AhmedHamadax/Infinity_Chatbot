@@ -2219,7 +2219,8 @@ def scientific_rag_node(state: Routine_Filling):
     final_docs, scores = rerank(
         original_question,
         retrieved_docs,
-        top_k=len(retrieved_docs)
+        top_k=len(retrieved_docs),
+        threshold=0.0
     )
 
 
@@ -2280,7 +2281,7 @@ def scientific_rag_node(state: Routine_Filling):
 
 
     # =========================================================
-    # 9. Fallback to top 3
+    # 9. Fallback to top 4
     # =========================================================
 
     if (
@@ -2290,13 +2291,13 @@ def scientific_rag_node(state: Routine_Filling):
 
         print(
             "\nNo document passed the rerank threshold."
-            "\nSelecting the top 3 highest-ranked documents."
+            "\nSelecting the top 4 highest-ranked documents."
         )
 
         high_quality_results = list(
             zip(
-                final_docs[:3],
-                scores[:3]
+                final_docs[:4],
+                scores[:4]
             )
         )
 
