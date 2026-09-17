@@ -3,6 +3,85 @@
 
 from pathlib import Path
 import os
+import sys
+import builtins
+
+# =========================================================
+# DEBUG / STREAMLIT CLOUD LOGGING
+# =========================================================
+# Force stdout to be written immediately so print/debug output
+# appears in Streamlit Community Cloud logs without buffering.
+try:
+    sys.stdout.reconfigure(line_buffering=True, write_through=True)
+except Exception:
+    pass
+
+# Keep every existing print() in this file exactly as it behaves now,
+# but force flush=True unless explicitly overridden.
+_ORIGINAL_PRINT = builtins.print
+
+def print(*args, **kwargs):
+    kwargs.setdefault("flush", True)
+    return _ORIGINAL_PRINT(*args, **kwargs)
+
+
+DEBUG_MODE = True
+DEBUG_CONTENT_PREVIEW = 1200
+
+
+def _debug_header(title):
+    if not DEBUG_MODE:
+        return
+
+    print("\n" + "=" * 120)
+    print(f"DEBUG | {title}")
+    print("=" * 120)
+
+
+def _debug_value(label, value):
+    if DEBUG_MODE:
+        print(f"DEBUG | {label}: {value}")
+
+
+def _debug_doc(
+    doc,
+    index=None,
+    score=None,
+    score_label=None,
+    full_content=False
+):
+    if not DEBUG_MODE:
+        return
+
+    print("-" * 120)
+    print(f"DEBUG | Document {index if index is not None else ''}")
+
+    if score is not None:
+        print(f"DEBUG | {score_label or 'score'}: {score}")
+
+    print(f"DEBUG | metadata: {getattr(doc, 'metadata', None)}")
+
+    content = getattr(doc, "page_content", "")
+    print("DEBUG | content:")
+    print(
+        content if full_content
+        else content[:DEBUG_CONTENT_PREVIEW]
+    )
+
+
+def _debug_state_snapshot(
+    state,
+    keys=None,
+    title="STATE SNAPSHOT"
+):
+    if not DEBUG_MODE:
+        return
+
+    _debug_header(title)
+
+    for key in (keys or list(state.keys())):
+        print(f"DEBUG | state[{key!r}] = {state.get(key)}")
+
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "ALLURE Docs"
@@ -335,6 +414,40 @@ def rerank(question, docs, top_k=None, threshold=0.8):
         key=lambda x: float(x[2]),
         reverse=True
     )
+
+    # ---------------------------------------------------------
+    # DEBUG: show EVERY reranker result BEFORE internal threshold
+    # ---------------------------------------------------------
+    # This is debug-only. The filtering logic below is unchanged.
+    if DEBUG_MODE:
+        _debug_header("RERANK SCORES BEFORE INTERNAL THRESHOLD")
+        _debug_value("rerank query", question)
+        _debug_value("internal rerank threshold", threshold)
+        _debug_value("candidate document count", len(ranked))
+
+        for i, (doc, raw_score, sigmoid_score) in enumerate(
+            ranked,
+            start=1
+        ):
+            decision = (
+                "PASS"
+                if float(sigmoid_score) >= threshold
+                else "FAIL"
+            )
+
+            print(
+                f"DEBUG | Rank {i} | {decision} | "
+                f"Raw logit={float(raw_score):.6f} | "
+                f"Sigmoid={float(sigmoid_score):.6f} | "
+                f"Threshold={threshold}"
+            )
+
+            _debug_doc(
+                doc,
+                index=i,
+                score=float(sigmoid_score),
+                score_label="reranker sigmoid score"
+            )
 
     # -----------------------------
     # Apply threshold
@@ -1470,6 +1583,28 @@ def merge_node(state: Routine_Filling) -> dict:
 def Orchestrator_Node(state: Routine_Filling) -> dict:
     print("Orchestrator Node Called")
 
+    _debug_header("ORCHESTRATOR INPUT")
+    _debug_value(
+        "current_question",
+        state.get("current_question")
+    )
+    _debug_value(
+        "skin_type",
+        state.get("skin_type")
+    )
+    _debug_value(
+        "skin_concern",
+        state.get("skin_concern")
+    )
+    _debug_value(
+        "pregnancy",
+        state.get("pregnancy")
+    )
+    _debug_value(
+        "allergies_or_sensitivity",
+        state.get("allergies_or_sensitivity")
+    )
+
     system_prompt = """
 You are the Orchestrator of a multi-agent skincare system.
 
@@ -1732,11 +1867,31 @@ Do not create duplicate tasks for the same agent.
         temperature=0
     )
 
+    _debug_header("ORCHESTRATOR RAW LLM OUTPUT")
+    _debug_value(
+        "raw orchestrator response",
+        response.choices[0].message.content
+    )
+
     response = json.loads(
         response.choices[0].message.content
     )
 
     selected_agents = response["agent_tasks"]
+
+    _debug_header("ORCHESTRATOR PARSED TASKS")
+    _debug_value(
+        "selected_agents",
+        selected_agents
+    )
+
+    for task_index, task in enumerate(
+        selected_agents,
+        start=1
+    ):
+        print(
+            f"DEBUG | Task {task_index}: {task}"
+        )
 
     print("selected_agents")
     print(selected_agents)
@@ -1784,6 +1939,32 @@ def scientific_rag_node(state: Routine_Filling):
     print("Scientific Retrieval Query:")
     print(original_question)
 
+    _debug_header("SCIENTIFIC RAG INPUT")
+    _debug_value(
+        "user/current question",
+        state.get("current_question")
+    )
+    _debug_value(
+        "orchestrator scientific task",
+        scientific_task
+    )
+    _debug_value(
+        "scientific retrieval query",
+        original_question
+    )
+    _debug_value(
+        "skin concerns used for metadata filtering",
+        concerns
+    )
+    _debug_value(
+        "MIN_RERANK_SCORE",
+        MIN_RERANK_SCORE
+    )
+    _debug_value(
+        "RETRIEVAL_K",
+        RETRIEVAL_K
+    )
+
 
     # =========================================================
     # 2. Metadata pre-filter for BM25
@@ -1798,6 +1979,20 @@ def scientific_rag_node(state: Routine_Filling):
     # If no matching metadata exists, search whole KB
     if not useful_docs:
         useful_docs = splited_docs
+
+    _debug_header("SCIENTIFIC METADATA PRE-FILTER")
+    _debug_value(
+        "concerns",
+        concerns
+    )
+    _debug_value(
+        "documents in BM25 retrieval pool",
+        len(useful_docs)
+    )
+    _debug_value(
+        "total split KB documents",
+        len(splited_docs)
+    )
 
 
     bm25 = BM25Retriever.from_documents(
@@ -1833,6 +2028,12 @@ def scientific_rag_node(state: Routine_Filling):
             "$or": filters
         }
 
+    _debug_header("SCIENTIFIC SEMANTIC FILTER")
+    _debug_value(
+        "semantic_filter",
+        semantic_filter
+    )
+
 
     # =========================================================
     # 4. Hybrid Retriever
@@ -1845,6 +2046,96 @@ def scientific_rag_node(state: Routine_Filling):
     if semantic_filter:
         vector_kwargs["filter"] = semantic_filter
 
+
+    # ---------------------------------------------------------
+    # DEBUG ONLY: inspect the individual retrieval components
+    # ---------------------------------------------------------
+    if DEBUG_MODE:
+        _debug_header("SCIENTIFIC BM25 DEBUG RETRIEVAL")
+        _debug_value(
+            "query",
+            original_question
+        )
+
+        try:
+            bm25_debug_docs = bm25.invoke(
+                original_question
+            )
+
+            _debug_value(
+                "BM25 returned docs",
+                len(bm25_debug_docs)
+            )
+
+            for i, doc in enumerate(
+                bm25_debug_docs,
+                start=1
+            ):
+                _debug_doc(
+                    doc,
+                    index=i,
+                    score=i,
+                    score_label=(
+                        "BM25 rank "
+                        "(BM25Retriever does not expose a numeric score here)"
+                    )
+                )
+
+        except Exception as debug_error:
+            print(
+                "DEBUG | BM25 debug retrieval failed: "
+                f"{debug_error}"
+            )
+
+        _debug_header("SCIENTIFIC FAISS DEBUG RETRIEVAL")
+        _debug_value(
+            "query",
+            original_question
+        )
+
+        try:
+            if semantic_filter:
+                faiss_debug_results = (
+                    Routine_Agent_vectorstore
+                    .similarity_search_with_score(
+                        original_question,
+                        k=RETRIEVAL_K,
+                        filter=semantic_filter
+                    )
+                )
+            else:
+                faiss_debug_results = (
+                    Routine_Agent_vectorstore
+                    .similarity_search_with_score(
+                        original_question,
+                        k=RETRIEVAL_K
+                    )
+                )
+
+            _debug_value(
+                "FAISS returned docs",
+                len(faiss_debug_results)
+            )
+
+            for i, (doc, score) in enumerate(
+                faiss_debug_results,
+                start=1
+            ):
+                _debug_doc(
+                    doc,
+                    index=i,
+                    score=float(score),
+                    score_label=(
+                        "FAISS native score/distance "
+                        "(interpret according to FAISS distance strategy)"
+                    )
+                )
+
+        except Exception as debug_error:
+            print(
+                "DEBUG | FAISS debug retrieval failed: "
+                f"{debug_error}"
+            )
 
     hybrid_retriever = EnsembleRetriever(
         retrievers=[
@@ -1894,6 +2185,32 @@ def scientific_rag_node(state: Routine_Filling):
         f"unique candidate documents"
     )
 
+    _debug_header(
+        "SCIENTIFIC HYBRID RETRIEVAL - UNIQUE CANDIDATES"
+    )
+    _debug_value(
+        "hybrid weights",
+        {"bm25": 0.2, "faiss": 0.8}
+    )
+    _debug_value(
+        "unique candidate count",
+        len(retrieved_docs)
+    )
+
+    for i, doc in enumerate(
+        retrieved_docs,
+        start=1
+    ):
+        _debug_doc(
+            doc,
+            index=i,
+            score=i,
+            score_label=(
+                "hybrid output rank "
+                "(EnsembleRetriever does not expose a final numeric score)"
+            )
+        )
+
 
     # =========================================================
     # 7. Rerank ALL candidate documents
@@ -1906,10 +2223,42 @@ def scientific_rag_node(state: Routine_Filling):
     )
 
 
-    for doc, score in zip(
-        final_docs,
-        scores
+    _debug_header(
+        "SCIENTIFIC RERANK RESULTS VS SCIENTIFIC THRESHOLD"
+    )
+    _debug_value(
+        "scientific threshold",
+        MIN_RERANK_SCORE
+    )
+    _debug_value(
+        "documents surviving rerank() internal threshold",
+        len(final_docs)
+    )
+
+    for rank_index, (doc, score) in enumerate(
+        zip(final_docs, scores),
+        start=1
     ):
+
+        scientific_decision = (
+            "PASS"
+            if score >= MIN_RERANK_SCORE
+            else "FAIL"
+        )
+
+        print(
+            f"DEBUG | Scientific Rank {rank_index} | "
+            f"{scientific_decision} | "
+            f"Score={score:.6f} | "
+            f"Scientific Threshold={MIN_RERANK_SCORE}"
+        )
+
+        _debug_doc(
+            doc,
+            index=rank_index,
+            score=score,
+            score_label="reranker sigmoid score"
+        )
 
         print(f"doc -> {doc}")
         print(f"score -> {score}")
@@ -2612,6 +2961,24 @@ def safety_node(state: Routine_Filling):
             f"reaction or irritation: {state['current_question']}"
         )
 
+    _debug_header("SAFETY QUERIES BUILT")
+    _debug_value(
+        "safety_checks",
+        safety_checks
+    )
+    _debug_value(
+        "safety_queries",
+        safety_queries
+    )
+    _debug_value(
+        "MIN_RET_THRESHOLD",
+        MIN_RET_THRESHOLD
+    )
+    _debug_value(
+        "RETRIEVAL_K",
+        RETRIEVAL_K
+    )
+
     # --------------------------------------------------
     # 4. If no safety query can be built
     # --------------------------------------------------
@@ -2706,6 +3073,32 @@ def safety_node(state: Routine_Filling):
         print(query)
 
         retrieved_docs = hybrid_retriever.invoke(query)
+
+        _debug_header(
+            "SAFETY HYBRID RETRIEVAL - RAW CANDIDATES"
+        )
+        _debug_value(
+            "safety retrieval query",
+            query
+        )
+        _debug_value(
+            "raw candidate count",
+            len(retrieved_docs)
+        )
+
+        for i, doc in enumerate(
+            retrieved_docs,
+            start=1
+        ):
+            _debug_doc(
+                doc,
+                index=i,
+                score=i,
+                score_label=(
+                    "hybrid output rank "
+                    "(EnsembleRetriever does not expose a final numeric score)"
+                )
+            )
 
         reranked_docs, scores = rerank(
             query,
