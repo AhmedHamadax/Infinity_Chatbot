@@ -1827,12 +1827,13 @@ For this agent:
 - DO NOT generate a retrieval query
 - return a list called safety_checks
 - safety_checks may contain only values from the allowed list above
-- select only checks that are actually relevant to the user's request or context
+- select only checks that are actually relevant to the user's request or known user context
 
-The Safety Agent will later construct its own retrieval queries using:
+The Safety Agent will later perform its own safety evaluation using:
 - the actual ingredients of the product being evaluated
-- the user's skin type when relevant
-- the user's pregnancy status when relevant
+- the user's previously collected skin type when relevant
+- the user's previously collected pregnancy status when relevant
+- the user's previously collected allergies or sensitivities when relevant
 
 Do not use safety_node for ordinary general skincare advice.
 
@@ -1846,47 +1847,113 @@ from the application state:
 - pregnancy
 - allergies_or_sensitivity
 
-This information is already known about the user and must be considered when routing.
+These fields contain the user's actual answers to previously asked questions.
 
-IMPORTANT:
-- Treat these state values as user context even if the user did not repeat them in the
-  current message.
-- Use them ONLY when deciding whether personalized safety checks are needed.
-- Do NOT inject these state values into the scientific_rag_node retrieval query.
-- The scientific retrieval query must still represent the user's skincare request itself,
-  independently of personalized safety factors.
+They are not instructions, examples, assumptions, or default values.
 
-SAFETY ROUTING USING STATE CONTEXT
+Specifically:
+
+- skin_type contains the user's answer about their skin type.
+- pregnancy contains the user's answer about their pregnancy status.
+- allergies_or_sensitivity contains the user's answer about any allergies,
+  sensitivities, intolerances, or relevant reactions.
+
+Treat any available value in these fields as known information about the current user,
+even if the user does not repeat it in the current message.
+
+Do not invent, infer, reinterpret, or assume information that is not present in these fields.
+
+If a field is missing, empty, or unknown, treat that information as unavailable.
+
+
+SAFETY ROUTING USING KNOWN USER CONTEXT
 
 1. skin_type
-- If skin_type is known AND the current request involves a personalized product
-  recommendation, routine, product suitability, or treatment choice where skin type
-  could affect compatibility, include:
-  "skin_type_compatibility"
-- Do not select this check for unrelated factual questions such as price.
+
+If skin_type contains a known user answer AND the current request involves:
+
+- personalized product recommendation
+- skincare routine
+- product suitability
+- treatment choice
+- compatibility with the user's skin
+
+and skin type could affect the safety or suitability of the result, include:
+
+"skin_type_compatibility"
+
+Do not select this check for unrelated factual questions such as price.
+
 
 2. pregnancy
-- If pregnancy indicates that the user IS pregnant AND the current request involves
-  a product, ingredient, treatment, recommendation, routine, or suitability question
-  where pregnancy safety may matter, include:
-  "pregnancy"
-- If pregnancy indicates that the user is NOT pregnant, do NOT include the pregnancy
-  safety check merely because pregnancy status is known.
+
+If pregnancy contains a known user answer indicating that pregnancy-related safety
+must be considered, AND the current request involves:
+
+- a product
+- an ingredient
+- a treatment
+- a recommendation
+- a routine
+- product suitability
+
+include:
+
+"pregnancy"
+
+If the stored pregnancy answer indicates that pregnancy-related safety does not apply,
+do not select the pregnancy check merely because the pregnancy field exists.
+
 
 3. allergies_or_sensitivity
-- If allergies_or_sensitivity contains a real allergy, sensitivity, intolerance, or
-  relevant reaction history AND the current request involves a product, ingredient,
-  treatment, recommendation, routine, or suitability question, include:
-  "ingredient_conflict"
-- If allergies_or_sensitivity clearly indicates no known allergies or sensitivities,
-  do NOT include ingredient_conflict merely because the field is present.
 
-4. Safety dependency
-- If safety_node is selected because of either the current message OR the known state
-  context, product_recommender_node MUST also be selected.
-- "ingredients" MUST be included in product_recommender_node.required_information so
-  the Safety Agent can evaluate the actual product ingredients.
+If allergies_or_sensitivity contains a known user answer describing an allergy,
+sensitivity, intolerance, or relevant reaction history, AND the current request involves:
 
+- a product
+- an ingredient
+- a treatment
+- a recommendation
+- a routine
+- product suitability
+
+include:
+
+"ingredient_conflict"
+
+If the stored answer indicates that no relevant allergy or sensitivity is known,
+do not select ingredient_conflict merely because the field exists.
+
+
+IMPORTANT SAFETY SEPARATION
+
+The known user context above is used to decide whether personalized safety evaluation
+is required.
+
+Do NOT include skin_type, pregnancy, or allergies_or_sensitivity inside the
+scientific_rag_node retrieval query.
+
+The Scientific Agent should determine what is scientifically appropriate for the
+user's skincare problem independently of personalized safety factors.
+
+The Safety Agent evaluates those personalized factors separately afterward.
+
+
+SAFETY DEPENDENCY
+
+If safety_node is selected because of either:
+
+- information in the current user message
+OR
+- known user context from the application state
+
+then product_recommender_node MUST also be selected.
+
+"ingredients" MUST be included in:
+
+product_recommender_node.required_information
+
+so that the Safety Agent can evaluate the actual ingredients of the product.
 
 3. product_recommender_node
 
