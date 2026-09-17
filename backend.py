@@ -2562,98 +2562,444 @@ def product_recommender_node(state: Routine_Filling):
 
     print("product_recommender_node called")
 
-    required_information = [
-        agent["required_information"]
-        for agent in state["required_agents"]
-        if agent["agent"] == "product_recommender_node"
-    ]
+    # =========================================================
+    # 1. Get Product Recommender Task from Orchestrator
+    # =========================================================
 
-    if not required_information:
+    product_task = next(
+        (
+            agent
+            for agent in state["required_agents"]
+            if agent["agent"] == "product_recommender_node"
+        ),
+        None
+    )
+
+    if not product_task:
+        print("No product_recommender_node task found")
+
         return {
-            "current_agent_index": state["current_agent_index"] + 1
+            "current_agent_index":
+                state["current_agent_index"] + 1
         }
 
-    required_information = required_information[0]
+
+    # =========================================================
+    # 2. Get Required Information + Product Reference
+    # =========================================================
+
+    required_information = product_task.get(
+        "required_information",
+        []
+    )
+
+    product_reference = product_task.get(
+        "product_reference",
+        ""
+    )
+
+    print("required_information:", required_information)
+    print("product_reference from Orchestrator:", product_reference)
+
+
+    # =========================================================
+    # 3. Determine Which Product(s) Should Be Queried
+    # =========================================================
+
+    products_to_query = []
+
+
+    # ---------------------------------------------------------
+    # Case A:
+    # Product was selected by Scientific Agent
+    # ---------------------------------------------------------
+
+    if product_reference == "selected_product_from_scientific":
+
+        print(
+            "Product must be taken from "
+            "scientific_rag_node output"
+        )
+
+        scientific_products = state.get(
+            "products_mentioned",
+            []
+        )
+
+        print(
+            "products_mentioned from scientific:",
+            scientific_products
+        )
+
+        for prod in scientific_products:
+
+            if isinstance(prod, dict):
+
+                product_name = prod.get(
+                    "product_name"
+                )
+
+            else:
+
+                product_name = str(prod)
+
+
+            if product_name:
+
+                products_to_query.append(
+                    product_name
+                )
+
+
+    # ---------------------------------------------------------
+    # Case B:
+    # User explicitly mentioned a product
+    # Orchestrator already resolved its reference
+    # ---------------------------------------------------------
+
+    elif product_reference:
+
+        print(
+            "Using product_reference directly "
+            "from Orchestrator"
+        )
+
+        products_to_query.append(
+            product_reference
+        )
+
+
+    # ---------------------------------------------------------
+    # Fallback only if Orchestrator returned no product_reference
+    # ---------------------------------------------------------
+
+    else:
+
+        print(
+            "WARNING: Orchestrator returned no "
+            "product_reference. Falling back to "
+            "state['products_mentioned']"
+        )
+
+        for prod in state.get(
+            "products_mentioned",
+            []
+        ):
+
+            if isinstance(prod, dict):
+
+                product_name = prod.get(
+                    "product_name"
+                )
+
+            else:
+
+                product_name = str(prod)
+
+
+            if product_name:
+
+                products_to_query.append(
+                    product_name
+                )
+
+
+    print(
+        "Products to query BEFORE DB matching:",
+        products_to_query
+    )
+
+
+    # =========================================================
+    # 4. Get All Product Names from Database
+    # =========================================================
+
+    PRODUCT_NAMES = [
+        row[0]
+        for row in cursor.execute(
+            "SELECT product_name FROM products"
+        ).fetchall()
+    ]
+
+    print(
+        "Number of products in DB:",
+        len(PRODUCT_NAMES)
+    )
+
+
+    # =========================================================
+    # 5. Prepare Outputs
+    # =========================================================
 
     information_output = []
     Ingredients_to_check = []
 
-    print("required_information:", required_information)
+    FUZZY_MATCH_THRESHOLD = 80
 
-    for prod in state["products_mentioned"]:
-        PRODUCT_NAMES = [
-            row[0]
-            for row in cursor.execute("SELECT product_name FROM products").fetchall()
-        ]
 
-        product_name = prod["product_name"]
+    # =========================================================
+    # 6. Resolve Product Name Against Database
+    # =========================================================
 
-        product_name = process.extractOne(
-            product_name,
-            PRODUCT_NAMES,
-            scorer=fuzz.WRatio
-        )[0]
+    for original_product_reference in products_to_query:
+
+        print("\n" + "=" * 100)
+        print("PRODUCT MATCHING DEBUG")
+        print("=" * 100)
+
+        print(
+            "Original Product Reference:",
+            original_product_reference
+        )
+
+
+        # -----------------------------------------------------
+        # First try exact case-insensitive match
+        # -----------------------------------------------------
+
+        exact_match = next(
+            (
+                db_product
+                for db_product in PRODUCT_NAMES
+                if db_product.lower().strip()
+                ==
+                original_product_reference.lower().strip()
+            ),
+            None
+        )
+
+
+        if exact_match:
+
+            product_name = exact_match
+            match_score = 100.0
+
+            print(
+                "Exact DB match found:",
+                product_name
+            )
+
+            print(
+                "Match Score:",
+                match_score
+            )
+
+
+        # -----------------------------------------------------
+        # If exact match fails, use fuzzy matching
+        # -----------------------------------------------------
+
+        else:
+
+            match = process.extractOne(
+                original_product_reference,
+                PRODUCT_NAMES,
+                scorer=fuzz.WRatio
+            )
+
+
+            if not match:
+
+                print(
+                    "No fuzzy match found for:",
+                    original_product_reference
+                )
+
+                information_output.append(
+                    f"No product matching "
+                    f"{original_product_reference} "
+                    f"was found"
+                )
+
+                continue
+
+
+            product_name = match[0]
+            match_score = match[1]
+
+
+            print(
+                "Best Fuzzy DB Match:",
+                product_name
+            )
+
+            print(
+                "Fuzzy Match Score:",
+                match_score
+            )
+
+            print(
+                "Fuzzy Match Threshold:",
+                FUZZY_MATCH_THRESHOLD
+            )
+
+
+            # -------------------------------------------------
+            # Reject weak product matches
+            # -------------------------------------------------
+
+            if match_score < FUZZY_MATCH_THRESHOLD:
+
+                print(
+                    "PRODUCT MATCH REJECTED "
+                    "because score is below threshold"
+                )
+
+                information_output.append(
+                    f"No confident product match was found "
+                    f"for {original_product_reference}"
+                )
+
+                continue
+
+
+            print(
+                "PRODUCT MATCH ACCEPTED"
+            )
+
+
+        # =====================================================
+        # 7. Retrieve Requested Information
+        # =====================================================
 
         for req in required_information:
+
+            # Only allow real database fields
+            if req not in {
+                "price",
+                "ingredients",
+                "product_type"
+            }:
+
+                print(
+                    "Unsupported required information:",
+                    req
+                )
+
+                continue
+
+
             query = f"""
             SELECT {req}
             FROM products
-            WHERE lower(product_name) LIKE lower('%{product_name}%')
+            WHERE lower(product_name) = lower(?)
             """
 
+
+            print("\nSQL QUERY:")
             print(query)
 
-            cursor.execute(
-                query
+            print(
+                "SQL PRODUCT PARAMETER:",
+                product_name
             )
+
+
+            cursor.execute(
+                query,
+                (product_name,)
+            )
+
 
             product_returned = cursor.fetchone()
 
+
             if not product_returned:
-                information_output.append(
-                    f"No {req} information was found for {product_name}"
+
+                print(
+                    f"No {req} found for:",
+                    product_name
                 )
+
+                information_output.append(
+                    f"No {req} information was found "
+                    f"for {product_name}"
+                )
+
                 continue
 
-            # fetchone() returns a tuple, e.g. ("retinol, niacinamide",)
+
+            # fetchone() returns a tuple
             value = product_returned[0]
+
+
+            print(
+                f"Retrieved {req}:",
+                value
+            )
+
 
             information_output.append(
                 f"The {req} of {product_name} is {value}"
             )
 
-            # ----------------------------------------
-            # Send ingredients separately to Safety
-            # ----------------------------------------
+
+            # =================================================
+            # 8. Send Ingredients Separately to Safety Agent
+            # =================================================
 
             if req == "ingredients" and value:
 
-                # assuming ingredients are stored as comma-separated text
                 ingredients = [
                     ingredient.strip()
                     for ingredient in value.split(",")
                     if ingredient.strip()
                 ]
 
-                Ingredients_to_check.extend(ingredients)
+                Ingredients_to_check.extend(
+                    ingredients
+                )
 
-    # Remove duplicated ingredients while preserving order
-    Ingredients_to_check = list(dict.fromkeys(Ingredients_to_check))
 
-    information_output = "\n".join(information_output)
+    # =========================================================
+    # 9. Remove Duplicate Ingredients
+    # =========================================================
 
-    print("information_output")
+    Ingredients_to_check = list(
+        dict.fromkeys(
+            Ingredients_to_check
+        )
+    )
+
+
+    information_output = "\n".join(
+        information_output
+    )
+
+
+    # =========================================================
+    # 10. Final Debug
+    # =========================================================
+
+    print("\n" + "=" * 100)
+    print("PRODUCT RECOMMENDER FINAL OUTPUT")
+    print("=" * 100)
+
+    print("information_output:")
     print(information_output)
 
-    print("Ingredients_to_check")
+    print("Ingredients_to_check:")
     print(Ingredients_to_check)
 
-    new_indc = state["current_agent_index"] + 1
+
+    # =========================================================
+    # 11. Update State
+    # =========================================================
+
+    new_indc = (
+        state["current_agent_index"] + 1
+    )
+
 
     return {
-        "current_agent_index": new_indc,
-        "product_recommender_node_info": information_output,
-        "Ingredients_to_check": Ingredients_to_check
+        "current_agent_index":
+            new_indc,
+
+        "product_recommender_node_info":
+            information_output,
+
+        "Ingredients_to_check":
+            Ingredients_to_check
     }
 
 # ===== Source notebook cell 89 =====
