@@ -2997,8 +2997,9 @@ def product_recommender_node(state: Routine_Filling):
             ),
             None
         )
-
-
+        
+        original_product_reference=original_product_reference.lower().strip("Infinity")
+        original_product_reference=original_product_reference.lower().strip("infinity")
         if exact_match:
 
             product_name = exact_match
@@ -3020,7 +3021,8 @@ def product_recommender_node(state: Routine_Filling):
         # -----------------------------------------------------
 
         else:
-            original_product_reference=original_product_reference.lower().strip("Infinity")
+            print("original_product_reference----------->")
+            print(original_product_reference)
             match = process.extractOne(
                 original_product_reference,
                 PRODUCT_NAMES,
