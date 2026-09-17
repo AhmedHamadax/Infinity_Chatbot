@@ -2791,7 +2791,7 @@ def product_recommender_node(state: Routine_Filling):
         # -----------------------------------------------------
 
         else:
-            original_product_reference=original_product_reference.lower.strip("Infinity")
+            original_product_reference=original_product_reference.lower().strip("Infinity")
             match = process.extractOne(
                 original_product_reference,
                 PRODUCT_NAMES,
