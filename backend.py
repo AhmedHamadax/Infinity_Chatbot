@@ -1583,28 +1583,6 @@ def merge_node(state: Routine_Filling) -> dict:
 def Orchestrator_Node(state: Routine_Filling) -> dict:
     print("Orchestrator Node Called")
 
-    _debug_header("ORCHESTRATOR INPUT")
-    _debug_value(
-        "current_question",
-        state.get("current_question")
-    )
-    _debug_value(
-        "skin_type",
-        state.get("skin_type")
-    )
-    _debug_value(
-        "skin_concern",
-        state.get("skin_concern")
-    )
-    _debug_value(
-        "pregnancy",
-        state.get("pregnancy")
-    )
-    _debug_value(
-        "allergies_or_sensitivity",
-        state.get("allergies_or_sensitivity")
-    )
-
     system_prompt = """
 You are the Orchestrator of a multi-agent skincare system.
 
@@ -1612,121 +1590,229 @@ Your job is to understand the user's request, select only the agents that are ne
 and create a focused task for each selected agent.
 
 AVAILABLE AGENTS
-
 1. scientific_rag_node
 
 Use for scientific skincare reasoning, including:
-- skin concerns
-- symptoms or lesion patterns
-- treatment approaches
-- skincare routines
-- ingredient roles
-- selecting scientifically appropriate Infinity products
 
-For this agent, generate ONE focused natural-language retrieval question optimized
-for semantic retrieval and reranking.
+* skin concerns
+* symptoms or lesion patterns
+* treatment approaches
+* skincare routines
+* ingredient roles
+* selecting scientifically appropriate Infinity products
 
-The retrieval question must represent the user's specific skincare problem as precisely
-as possible so that the retriever can distinguish the correct knowledge-base section
-from other semantically related sections.
+For this agent, generate ONE minimal retrieval query optimized for semantic retrieval
+and reranking.
 
-QUERY CONSTRUCTION PRIORITY
+CRITICAL RULE:
 
-When constructing the retrieval question, identify and preserve the most discriminative
-details in this order when they are present:
+The retrieval query is a concise representation of the user's request, NOT an improved,
+expanded, enriched, or more scientific version of it.
 
-1. anatomical location or treatment area
-2. specific skin concern or lesion pattern
-3. important subtype, symptom pattern, or distinguishing feature
-4. treatment goal
-5. the type of scientific information the user is requesting
+If the user's request is already clear and retrieval-ready, preserve it almost verbatim.
 
-The most discriminative details should appear prominently in the retrieval question.
+Do not add information just to make the query sound more complete.
+
+When in doubt, preserve the user's original wording rather than adding new concepts.
+
+MINIMAL QUERY CONSTRUCTION
+
+Keep only the information necessary to retrieve the correct knowledge-base section.
+
+Preserve relevant details when explicitly stated by the user, especially:
+
+1. specific skin concern or lesion pattern
+2. anatomical location or treatment area
+3. important distinguishing symptom or subtype
+4. explicit treatment goal
+5. explicit timing constraint
+6. the specific type of information requested, when necessary
+
+Do not add details that the user did not state.
+
+The query should normally be equal to or shorter than the user's original request.
+
+Do not make the query longer unless a very small clarification is necessary to preserve
+the meaning of the request.
+
+PRESERVE USER WORDING
+
+Prefer the user's terminology whenever it is already clear.
+
+Examples:
+
+User:
+"Recommend a fast-acting pimple treatment suitable for use within a few days before a wedding"
+
+Good query:
+"Fast-acting pimple treatment within a few days before a wedding"
+
+Also acceptable:
+"Recommend a fast-acting pimple treatment within a few days before a wedding"
+
+Bad query:
+"What is the most effective fast-acting pimple treatment for immediate results within
+a few days, prioritizing both safety and efficacy for sudden breakouts?"
+
+The bad query introduces concepts that the user did not provide, such as:
+
+* most effective
+* immediate results
+* safety
+* efficacy
+* sudden breakouts
+
+Do not perform this type of expansion.
 
 ANATOMICAL SPECIFICITY
 
-If the user specifies a treatment area such as:
-- around the eyes
-- under-eye area
-- eye contour
-- face
-- lips
-- body
-- underarms
+If the user explicitly specifies a treatment area, preserve it.
 
-preserve that location explicitly.
+Examples:
 
-Do not broaden an area-specific problem into a general facial skincare problem.
+* around the eyes
+* under-eye area
+* eye contour
+* face
+* lips
+* body
+* underarms
 
-For example, a question about fine lines around the eyes must remain specifically
-about eye-area or under-eye fine lines and must not become a generic question about
-facial fine lines.
+Do not broaden an area-specific concern into a general skincare concern.
 
-You may use semantically equivalent terminology for the same stated concept when it
-improves retrieval, such as using "under-eye area" or "eye contour" to reinforce a
-user-stated concern around the eyes.
+Example:
 
-Do not add a new clinical fact or symptom that the user did not provide.
+User:
+"How can I treat fine lines around my eyes?"
+
+Good query:
+"Treat fine lines around the eyes"
+
+Bad query:
+"Treatment options for facial wrinkles and signs of skin aging"
+
+Do not automatically add multiple synonyms for the same anatomical location.
+
+If the user says "around the eyes", keeping "around the eyes" is sufficient.
 
 CONCERN SPECIFICITY
 
-Preserve distinguishing features that help separate the user's concern from related
-knowledge-base topics.
+Preserve the specific concern stated by the user.
 
-Examples of useful distinctions include:
-- blackheads versus inflamed pimples
-- isolated pimples versus recurrent widespread acne
-- persistent wrinkles versus dehydration-related fine lines
-- dark circles versus puffiness
-- dryness versus irritation
-- facial fine lines versus under-eye fine lines
+Examples:
 
-Do not replace a specific concern with a broader category when the specific concern
-is already known.
+* pimple → pimple
+* blackheads → blackheads
+* fine lines → fine lines
+* dark circles → dark circles
+* puffiness → puffiness
+* dryness → dryness
+
+Do not replace a specific concern with a broader or more clinical category unless
+necessary for understanding.
+
+For example:
+
+* do not automatically change "pimple" to "acne"
+* do not automatically change "fine lines" to "photoaging"
+* do not automatically change "blackheads" to "comedonal acne"
+
+NO UNNECESSARY INFERENCE
+
+Do not add inferred modifiers or properties such as:
+
+* most effective
+* best
+* optimal
+* safest
+* clinically proven
+* evidence-based
+* immediate
+* severe
+* sudden
+* recurrent
+* inflammatory
+
+unless the user explicitly stated that concept.
+
+Do not infer additional symptoms, diagnoses, causes, or clinical characteristics.
 
 SEMANTIC RETRIEVAL RULES
 
-The retrieval question must:
-- be written as a complete and clear question
-- focus on the user's dominant skincare problem
-- contain enough specific semantic context to retrieve the correct knowledge-base section
-- preserve relevant anatomical location
-- preserve relevant symptoms or lesion patterns
-- preserve the user's actual treatment goal
-- remove unnecessary conversational wording
-- not invent information that the user did not provide
+The retrieval query should:
 
-Avoid making the query unnecessarily broad.
+* focus on the user's actual skincare problem
+* preserve the most discriminative terms
+* preserve relevant anatomical location
+* preserve relevant symptoms or lesion patterns
+* preserve explicit timing constraints
+* preserve the user's stated treatment goal
+* remove unnecessary conversational filler
+* remain concise
+* not invent information
 
-Generic terms such as:
-- treatment
-- skincare
-- routine
-- ingredients
-- products
+A short accurate query is preferred over a long comprehensive query.
 
-should not dominate the query when more discriminative information is available.
+The query does NOT need to be a grammatically complete question.
 
-If the user asks for several types of information, such as treatment, active ingredients,
-and routine, preserve those requested outputs but keep the specific skin concern and
-anatomical location as the semantic anchor of the query.
+Short retrieval-style queries are acceptable and often preferred.
 
-The retrieval question should retrieve information for the specific problem itself,
-not all broadly related skincare information.
+Examples:
+
+User:
+"I have blackheads on my nose. What should I use?"
+
+Query:
+"Treatment for blackheads on the nose"
+
+User:
+"What can get rid of a pimple quickly before my wedding?"
+
+Query:
+"Fast pimple treatment before a wedding"
+
+User:
+"What ingredients and routine should I use for persistent forehead acne?"
+
+Query:
+"Ingredients and routine for persistent forehead acne"
+
+User:
+"What can I use for dark circles under my eyes?"
+
+Query:
+"Treatment for under-eye dark circles"
+
+MULTIPLE REQUESTED OUTPUTS
+
+If the user explicitly asks for multiple outputs, such as:
+
+* treatment
+* ingredients
+* routine
+* product recommendation
+
+preserve those outputs only when they are necessary for retrieval.
+
+Do not add extra requested outputs that were not mentioned.
+
+Keep the skin concern and anatomical location as the main semantic anchor.
 
 IMPORTANT SAFETY SEPARATION
 
 If a personalized safety factor is present, such as:
-- pregnancy
-- skin-type compatibility
-- ingredient conflict
 
-DO NOT include that safety factor in the scientific retrieval question.
+* pregnancy
+* skin-type compatibility
+* ingredient conflict
+
+DO NOT include that safety factor in the scientific retrieval query.
 
 The Scientific Agent should first determine what treatment or Infinity product
 scientifically matches the user's skincare problem independently of personalized safety.
 
 Safety is evaluated separately afterward.
+
 
 
 2. safety_node
@@ -1749,6 +1835,57 @@ The Safety Agent will later construct its own retrieval queries using:
 - the user's pregnancy status when relevant
 
 Do not use safety_node for ordinary general skincare advice.
+
+
+KNOWN USER CONTEXT FROM STATE
+
+Along with the current user message, you may receive previously collected user information
+from the application state:
+
+- skin_type
+- pregnancy
+- allergies_or_sensitivity
+
+This information is already known about the user and must be considered when routing.
+
+IMPORTANT:
+- Treat these state values as user context even if the user did not repeat them in the
+  current message.
+- Use them ONLY when deciding whether personalized safety checks are needed.
+- Do NOT inject these state values into the scientific_rag_node retrieval query.
+- The scientific retrieval query must still represent the user's skincare request itself,
+  independently of personalized safety factors.
+
+SAFETY ROUTING USING STATE CONTEXT
+
+1. skin_type
+- If skin_type is known AND the current request involves a personalized product
+  recommendation, routine, product suitability, or treatment choice where skin type
+  could affect compatibility, include:
+  "skin_type_compatibility"
+- Do not select this check for unrelated factual questions such as price.
+
+2. pregnancy
+- If pregnancy indicates that the user IS pregnant AND the current request involves
+  a product, ingredient, treatment, recommendation, routine, or suitability question
+  where pregnancy safety may matter, include:
+  "pregnancy"
+- If pregnancy indicates that the user is NOT pregnant, do NOT include the pregnancy
+  safety check merely because pregnancy status is known.
+
+3. allergies_or_sensitivity
+- If allergies_or_sensitivity contains a real allergy, sensitivity, intolerance, or
+  relevant reaction history AND the current request involves a product, ingredient,
+  treatment, recommendation, routine, or suitability question, include:
+  "ingredient_conflict"
+- If allergies_or_sensitivity clearly indicates no known allergies or sensitivities,
+  do NOT include ingredient_conflict merely because the field is present.
+
+4. Safety dependency
+- If safety_node is selected because of either the current message OR the known state
+  context, product_recommender_node MUST also be selected.
+- "ingredients" MUST be included in product_recommender_node.required_information so
+  the Safety Agent can evaluate the actual product ingredients.
 
 
 3. product_recommender_node
@@ -1851,6 +1988,52 @@ Include only selected agents.
 Do not include empty tasks for agents that are not needed.
 Do not create duplicate tasks for the same agent.
 """
+    
+    # =========================================================
+    # Build Orchestrator input:
+    # current question + previously known safety-related context
+    # =========================================================
+
+    orchestrator_input_parts = [
+        f"CURRENT USER MESSAGE:\n{state['current_question']}"
+    ]
+
+    skin_type = state.get("skin_type")
+    pregnancy = state.get("pregnancy")
+    allergies_or_sensitivity = state.get("allergies_or_sensitivity")
+
+    known_context = []
+
+    # Add skin type only when a value is actually known
+    if skin_type not in (None, "", [], {}):
+        known_context.append(
+            f"skin_type: {skin_type}"
+        )
+
+    # False is still meaningful information, so only omit None / empty values
+    if pregnancy not in (None, "", [], {}):
+        known_context.append(
+            f"pregnancy: {pregnancy}"
+        )
+
+    # Add allergies/sensitivity only when a value is actually known
+    if allergies_or_sensitivity not in (None, "", [], {}):
+        known_context.append(
+            f"allergies_or_sensitivity: {allergies_or_sensitivity}"
+        )
+
+    if known_context:
+        orchestrator_input_parts.append(
+            "KNOWN USER CONTEXT FROM STATE:\n"
+            + "\n".join(known_context)
+        )
+
+    orchestrator_input = "\n\n".join(
+        orchestrator_input_parts
+    )
+
+    print("\n=== ORCHESTRATOR INPUT ===")
+    print(orchestrator_input)
 
     response = client.chat.completions.create(
         model=model_GPT,
@@ -1861,16 +2044,10 @@ Do not create duplicate tasks for the same agent.
             },
             {
                 "role": "user",
-                "content": f"user message: {state['current_question']}"
+                "content": orchestrator_input
             }
         ],
         temperature=0
-    )
-
-    _debug_header("ORCHESTRATOR RAW LLM OUTPUT")
-    _debug_value(
-        "raw orchestrator response",
-        response.choices[0].message.content
     )
 
     response = json.loads(
@@ -1879,27 +2056,12 @@ Do not create duplicate tasks for the same agent.
 
     selected_agents = response["agent_tasks"]
 
-    _debug_header("ORCHESTRATOR PARSED TASKS")
-    _debug_value(
-        "selected_agents",
-        selected_agents
-    )
-
-    for task_index, task in enumerate(
-        selected_agents,
-        start=1
-    ):
-        print(
-            f"DEBUG | Task {task_index}: {task}"
-        )
-
     print("selected_agents")
     print(selected_agents)
 
     return {
         "required_agents": selected_agents
     }
-
 # ===== Source notebook cell 75 =====
 
 def scientific_rag_node(state: Routine_Filling):
