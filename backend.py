@@ -596,6 +596,9 @@ def questions_breakdown_node(state: nodestate)-> str:
         print("All_Questions before strip breakdown: ",all_questions)
         all_questions = all_questions.strip().strip("[]")
         print("All_Questions after strip: ",all_questions)
+        all_questions=all_questions..split("\n")
+        print("aftersplit")
+        print(all_questions)
 
         return {'all_questions':all_questions,'current_question_index':0,'total_questions_count':len(all_questions)}
 
