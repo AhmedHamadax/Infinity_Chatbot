@@ -3376,8 +3376,9 @@ If NOT_READY:
     last_turns=state.get('Last_Turns',[]).copy()
     print("HEHE")
     last_turns.append(f"the user said: {state['current_question']}\n")
+    print("Go0")
     while True:
-
+        print("Go1")
         # كل مرة بنبعت الـ full conversation للـ LLM
         messages = [
             {
@@ -3385,7 +3386,7 @@ If NOT_READY:
                 "content": system_prompt
             }
         ]
-
+        print("Go2")
         messages.extend(conversation)
 
         response = client.chat.completions.create(
@@ -3393,7 +3394,7 @@ If NOT_READY:
             messages=messages,
             temperature=0
         )
-
+        print("Go3")
         answer = json.loads(
             response.choices[0].message.content
         )
