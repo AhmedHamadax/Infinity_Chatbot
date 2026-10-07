@@ -559,23 +559,21 @@ def questions_breakdown_node(state: nodestate)-> str:
         print("Questions are getting broken")
         print("All_Questions before breakdown: ",state['all_questions'])
         system_prompt = """
-        You are a question classifier.
+You are a user-input classifier and separator.
 
-        Your task is to identify and separate the user's inquiries.
+Your task is to identify and separate the user's inquiries, requests, and non-request statements.
 
-        Rules:
-        1. Return ONLY the actual inquiries or requests made by the user.
-        2. Do NOT convert user-provided facts, preferences, or context into questions.
-        3. Context that supports a question should remain attached to the relevant inquiry.
-        4. If the input contains:
-        - 1 inquiry → return [question1]
-        - 2 inquiries → return [question1, question2]
-        - 3 inquiries → return [question1, question2, question3]
-        5. Rewrite each inquiry as a standalone, clear, and complete question while preserving the user's meaning.
-        6. Do not invent questions that were not asked.
-        7. Output only a valid Python list of strings.
-
-        """       
+Rules:
+1. Return every meaningful part of the user's input.
+2. If a part of the input is an inquiry or request, rewrite it as a standalone, clear, and complete question or request while preserving the user's meaning.
+3. If a part of the input is NOT an inquiry or request, preserve it exactly as the user wrote it. Do not rewrite, expand, interpret, or remove it.
+4. Do NOT convert user-provided facts, preferences, context, or ordinary statements into questions.
+5. Context that directly supports an inquiry should remain attached to the relevant inquiry.
+6. Do not invent questions or requests that were not made by the user.
+7. Separate distinct inquiries, requests, or standalone non-request statements into separate list items when appropriate.
+8. Preserve the original order of the user's input.
+9. Output only a valid Python list of strings.
+"""     
  
 
         response = client.chat.completions.create(
