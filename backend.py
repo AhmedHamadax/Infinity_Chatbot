@@ -3395,7 +3395,7 @@ If NOT_READY:
             temperature=0
         )
         print("Go3")
-        print(answer)
+        print(response.choices[0].message.content)
         answer = json.loads(
             response.choices[0].message.content
         )
