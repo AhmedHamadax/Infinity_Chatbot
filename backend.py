@@ -596,7 +596,7 @@ def questions_breakdown_node(state: nodestate)-> str:
         print("All_Questions before strip breakdown: ",all_questions)
         all_questions = all_questions.strip().strip("[]")
         print("All_Questions after strip: ",all_questions)
-        all_questions=all_questions..split("\n")
+        all_questions=all_questions.split("\n")
         print("aftersplit")
         print(all_questions)
 
