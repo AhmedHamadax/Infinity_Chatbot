@@ -3463,7 +3463,7 @@ Never output anything outside this JSON object.
         ]
         print("Go2")
         messages.extend(conversation)
-
+        print(messages)
         response = client.chat.completions.create(
             model=model_GPT,
             messages=messages,
