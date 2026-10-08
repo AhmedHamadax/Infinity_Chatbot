@@ -2309,11 +2309,12 @@ Do not create duplicate tasks for the same agent.
         ],
         temperature=0
     )
+    print("Orch Resp")
 
     response = json.loads(
         response.choices[0].message.content
     )
-
+    print(response)
     selected_agents = response["agent_tasks"]
 
     print("selected_agents")
