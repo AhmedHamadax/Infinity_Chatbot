@@ -715,10 +715,6 @@ False
     response=response.choices[0].message.content
     print('response-->',response)
     if(response =='True'):
-            response=True
-    else:
-            response=False
-    if( bool(response)):
         
                 print("Question is unclear")
                 system_prompt = f"""
