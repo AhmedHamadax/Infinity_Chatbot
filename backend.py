@@ -712,7 +712,7 @@ False
             }
             ]
     )
-    response=response.choices[0].message.content
+    response=response.choices[0].message.content.strip()
     print('response-->',response)
     if(response =='True'):
         
