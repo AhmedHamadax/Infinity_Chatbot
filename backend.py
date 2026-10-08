@@ -3914,7 +3914,11 @@ def store_info_node(state : Routine_Filling):
 
 # ===== Source notebook cell 97 =====
 def shopify_order_node(state : Routine_Filling):
-    print("called safety_node")
+    print("called shopify_node")
+    new_indc = (
+        state["current_agent_index"] + 1
+    )
+    return {"current_agent_index":new_indc}
 
 # ===== Source notebook cell 98 =====
 def ask_missing_info(missing_inputs):
@@ -3970,6 +3974,7 @@ def routine_router_node(state : Routine_Filling):
     else:
         
         print("n_o_agents",n_o_agents)
+        print(state['current_agent_index'])
         nxt_agent=agents_to_run[state['current_agent_index']]
         print(nxt_agent)
         return nxt_agent
