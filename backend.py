@@ -101,7 +101,7 @@ model_GPT = os.getenv("OPENROUTER_MODEL", "qwen/qwen3-235b-a22b-2507")
 _openrouter_key = os.getenv("OPENROUTER_API_KEY")
 if not _openrouter_key:
     raise RuntimeError("OPENROUTER_API_KEY is missing. Add it to Streamlit Secrets.")
-client = OpenAI(base_url="https://api.cloudflare.com/client/v4/accounts/85e661d6a7ea58d175b01451a22f0b3e/ai/v1", api_key=_openrouter_key)
+client = OpenAI(base_url="https://api.cloudflare.com/client/v4/accounts/3f1f95e7ed717f6f4d32e1ce6f56ddb3/ai/v1", api_key=_openrouter_key)
 
 
 # ===== Source notebook cell 7 =====
