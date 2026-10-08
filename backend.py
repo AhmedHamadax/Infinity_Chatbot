@@ -3642,14 +3642,13 @@ import json
 def conversational_decider(state: Routine_Filling):
 
     print("conversational_decider called")
+    history = list(state.get("Last_Turns", []))
 
-    # نبدأ الـ mini-conversation بأول رسالة من العميل
-    conversation = [
-        {
-            "role": "user",
-            "content": state["current_question"]
-        }
-    ]
+    # الرسالة الحالية
+    current_user_msg = {"role": "user", "content": state["current_question"]}
+
+    # conversation = التاريخ + الرسالة الحالية
+    conversation = history + [current_user_msg]
 
     system_prompt = """
 You are the conversation readiness controller for the Infinity skincare assistant.
